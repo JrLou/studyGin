@@ -8,21 +8,28 @@ import (
 )
 
 func main() {
-	r := gin.Default()
+	router := gin.Default()
+	router.LoadHTMLFiles("./view/index.html", "./view/upload.html")
+	router.Static("/static", "./static")
+	router.StaticFS("/upload", http.Dir("upload"))
 
-	r.GET("/", func(ctx *gin.Context) {
-		ctx.String(http.StatusOK, "hello,work!")
+	router.StaticFile("/favicon.ico", "./static/favicon.ico")
+
+	router.GET("/", func(ctx *gin.Context) {
+		ctx.HTML(http.StatusOK, "index.html", nil)
 	})
-	r.POST("/testPost", getting)
-	r.PUT("/testPut", putting)
-	r.Run(":3510")
-}
+	router.GET("/upload.html", func(ctx *gin.Context) {
+		ctx.HTML(http.StatusOK, "upload.html", nil)
+	})
 
-func getting(ctx *gin.Context) {
-	fmt.Println("收到了Post请求")
-	ctx.String(http.StatusOK, "收到了Post请求")
-}
-func putting(ctx *gin.Context) {
-	fmt.Println("收到了Put请求")
-	ctx.String(http.StatusOK, "收到了Put请求")
+	router.POST("/upload", func(ctx *gin.Context) {
+		file, _ := ctx.FormFile("file")
+		if err := ctx.SaveUploadedFile(file, "./upload/"+file.Filename); err != nil {
+			fmt.Println(err)
+			ctx.String(http.StatusInternalServerError, "存储失败")
+		}
+		ctx.String(http.StatusOK, "上传成功")
+	})
+
+	router.Run(":3051")
 }
