@@ -24,9 +24,23 @@ func main() {
 
 	router.POST("/upload", func(ctx *gin.Context) {
 		file, _ := ctx.FormFile("file")
+		_, headers, err := ctx.Request.FormFile("file")
+		if err != nil {
+			ctx.String(http.StatusInternalServerError, "获取文件信息错误")
+			return
+		}
+		if headers.Size > 1 {
+			ctx.String(http.StatusInternalServerError, "文件过大")
+			return
+		}
+		if headers.Header.Get("Content-Type") != "image/png" {
+			ctx.String(http.StatusInternalServerError, "只能上传图片")
+			return
+		}
 		if err := ctx.SaveUploadedFile(file, "./upload/"+file.Filename); err != nil {
 			fmt.Println(err)
 			ctx.String(http.StatusInternalServerError, "存储失败")
+			return
 		}
 		ctx.String(http.StatusOK, "上传成功")
 	})
