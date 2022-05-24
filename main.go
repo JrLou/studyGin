@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/samber/lo"
 )
 
 func main() {
@@ -22,26 +23,43 @@ func main() {
 		ctx.HTML(http.StatusOK, "upload.html", nil)
 	})
 
+	//这个处理可以兼容单文件和多文件
 	router.POST("/upload", func(ctx *gin.Context) {
-		file, _ := ctx.FormFile("file")
-		_, headers, err := ctx.Request.FormFile("file")
+		form, err := ctx.MultipartForm()
 		if err != nil {
-			ctx.String(http.StatusInternalServerError, "获取文件信息错误")
+			ctx.String(http.StatusInternalServerError, "获取信息错误")
 			return
 		}
-		if headers.Size > 1 {
-			ctx.String(http.StatusInternalServerError, "文件过大")
+
+		files := form.File["file"]
+		fmt.Println("文件数量", files, len(files))
+
+		if len(files) == 0 {
+			ctx.String(http.StatusBadRequest, "文件不能为空")
 			return
 		}
-		if headers.Header.Get("Content-Type") != "image/png" {
-			ctx.String(http.StatusInternalServerError, "只能上传图片")
-			return
+
+		for _, file := range files {
+			fmt.Println("看看信息", file.Size)
+			fmt.Println("看看信息2", file.Header)
+			fmt.Println("看看信息3", file.Header.Get("Content-Type"))
+			fmt.Println("看看信息4", file.Header.Get("Content-Disposition"))
+			//1MB
+			if file.Size > 1<<20 {
+				ctx.String(http.StatusInternalServerError, "文件过大")
+				return
+			}
+			if !lo.Contains[string]([]string{"image/png", "text/xml"}, file.Header.Get("Content-Type")) {
+				ctx.String(http.StatusInternalServerError, "只能上传图片")
+				return
+			}
+			if err := ctx.SaveUploadedFile(file, "./upload/"+file.Filename); err != nil {
+				fmt.Println(err)
+				ctx.String(http.StatusInternalServerError, "存储失败")
+				return
+			}
 		}
-		if err := ctx.SaveUploadedFile(file, "./upload/"+file.Filename); err != nil {
-			fmt.Println(err)
-			ctx.String(http.StatusInternalServerError, "存储失败")
-			return
-		}
+
 		ctx.String(http.StatusOK, "上传成功")
 	})
 
